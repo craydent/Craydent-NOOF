@@ -198,7 +198,7 @@ function __checkDefined (modifiers, tName) {
         if (!modifiers.hasOwnProperty(modifier)){
             continue;
         }
-        var filtered = modifiers[modifier].filter(function (item){ return item.__name == tName});
+        var filtered = modifiers[modifier].filter(function (item){ return item.__name == tName;});
         if(!filtered.isEmpty()) {
             return filtered;
         }
@@ -220,10 +220,10 @@ $g.Interface = function (icls) {
     });   
 };
 $g.Namespace = function (name,cls){
-    if (!$g[name]) {
-        $g[name] = {};
-    }
-    $g[name][cls.getClass()] = cls;
+//    if (!$g.[name]) {
+//        $g[name] = {};
+//    }
+    $g.setProperty(name+"."+cls.getClass(),cls);
 };
 $g.Public = function (cls) {
     var blocks = __processClass(cls),
@@ -239,7 +239,7 @@ $g.Public = function (cls) {
 };
 $g.Use = function (name) {
     var funcs = "",
-    classes = $g[name];
+    classes = $g.getProperty(name);
     for(cls in classes) {
         funcs += classes[cls].toString();
     }
