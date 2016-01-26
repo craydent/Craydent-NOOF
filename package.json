@@ -1,0 +1,20 @@
+{
+  "name": "noof",
+  "version": "0.1.0",
+  "description": "Craydent Node Object Oriented Framework",
+  "main": "noof",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://cinada@bitbucket.org/craydent/craydent-noof.git"
+  },
+  "keywords": [
+    "craydent",
+    "noof"
+  ],
+  "author": "Clark Inada",
+  "license": "MIT",
+  "homepage": "https://bitbucket.org/craydent/craydent-noof#readme"
+}
