@@ -4,9 +4,8 @@
  *  create final property and methods to prevent override
  *  create abstract property and methods to ensure implementation
  */
-if (typeof $g == "undefined") {
-    GLOBAL.$g = GLOBAL;
-}
+require('craydent');
+
 $g.GarbageCollector = [];
 function __getClassProperties (cls) {
     return (__removeComments(cls).match(RegExp('(this|private|protected|public)\.(.|\n|\r\n)*?;','g'))||[]).map(function (p) {
@@ -59,7 +58,7 @@ function __strongerType(cls, options) {
             parts[2] = parts[2].trim();
             part[parts[2]] = parts[3];
             part.__name = parts[2];
-            value = tryEval(parts[3]);
+            value = $c.tryEval(parts[3]);
 
             if (parts[2].startsWith('method.')) {// this is a methodvar name = parts[2].replace('method.','');
                 var pname = parts[2].replace('method.','');
@@ -136,7 +135,7 @@ function __processBlocks(blocks, a, abstractClass, log) {
                 if (parts && parts.length == 4) { // is some kind of class property [0]=>block [1] => access modifier [2] => property [3] => value
                     var part = {}, value,pname;
                     part[parts[2]] = parts[3];
-                    value = parts[3] && (tryEval(parts[3]) || tryEval(parts[3].slice(0,-1)));
+                    value = parts[3] && ($c.tryEval(parts[3]) || $c.tryEval(parts[3].slice(0,-1)));
                     part.__name = parts[2].trim();
                     if (parts[2].startsWith('method.') /*|| (value && value.isFunction())*/) {// this is a methodvar name = parts[2].replace('method.','');
                         pname = parts[2].replace('method.','').trim();
@@ -203,27 +202,37 @@ function __checkDefined (modifiers, tName) {
     }
     return false;
 }
-$g.Abstract = function (acls) {
+module.exports.Abstract = function (acls) {
     return __strongerType(acls, {
         missing : "Abstract: missing required Class parameter",
         instantiation : "Abstract Class can not be instantiated",
         type : 1
     });
 };
-$g.Interface = function (icls) {
+module.exports.Interface = function (icls) {
     return __strongerType(icls, {
         missing : "Interface: missing required Class parameter",
         instantiation : "Interfaces can not be instantiated",
         type : 0
     });
 };
-$g.Namespace = function (name,cls){
+module.exports.Namespace = function (name,cls){
 //    if (!$g.[name]) {
 //        $g[name] = {};
 //    }
-    $g.setProperty(name+"."+cls.name,cls);
+    if (name.indexOf('.') == -1) {
+        !$g[name] && ($g[name] = "");
+        $g[name] += cls.toString();
+    } else {
+        var np = name.split('.')[0];
+        !$g[name] && ($g[name] = "");
+        $g[name] += cls.toString();
+        $g.setProperty(name+"."+cls.name,cls);
+    }
+
+
 };
-$g.Public = function (cls) {
+module.exports.Public = function (cls) {
     var blocks = __processClass(cls),
         name = cls.name,
         a = {methods:{public:[],protected:[],private:[],"this":[]},properties:{public:[],protected:[],private:[],"this":[]}}
@@ -234,14 +243,7 @@ $g.Public = function (cls) {
     $g[name].properties = a.properties;
     return $g[name];
 };
-$g.Use = function (name) {
-    var funcs = "",
-        classes = $g.getProperty(name);
-    for(cls in classes) {
-        funcs += classes[cls].toString();
-    }
-    return funcs;
-}
+module.exports.Use = eval;
 
 Function.prototype.extendsFrom = function (cls) {
     if (cls.___type === 0) {

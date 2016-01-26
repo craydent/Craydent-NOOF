@@ -16,5 +16,8 @@
   ],
   "author": "Clark Inada",
   "license": "MIT",
-  "homepage": "https://bitbucket.org/craydent/craydent-noof#readme"
+  "homepage": "https://bitbucket.org/craydent/craydent-noof#readme",
+  "dependencies": {
+    "craydent": "^0.4.0"
+  }
 }
