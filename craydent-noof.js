@@ -217,9 +217,6 @@ module.exports.Interface = function (icls) {
     });
 };
 module.exports.Namespace = function (name,cls){
-//    if (!$g.[name]) {
-//        $g[name] = {};
-//    }
     if (name.indexOf('.') == -1) {
         !$g[name] && ($g[name] = "");
         $g[name] += cls.toString();
@@ -229,8 +226,6 @@ module.exports.Namespace = function (name,cls){
         $g[name] += cls.toString();
         $g.setProperty(name+"."+cls.name,cls);
     }
-
-
 };
 module.exports.Public = function (cls) {
     var blocks = __processClass(cls),

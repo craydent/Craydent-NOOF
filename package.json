@@ -1,6 +1,6 @@
 {
   "name": "noof",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Craydent Node Object Oriented Framework",
   "main": "noof",
   "scripts": {
@@ -18,6 +18,6 @@
   "license": "MIT",
   "homepage": "https://bitbucket.org/craydent/craydent-noof#readme",
   "dependencies": {
-    "craydent": "^0.4.0"
+    "craydent": "^0.5.0"
   }
 }
