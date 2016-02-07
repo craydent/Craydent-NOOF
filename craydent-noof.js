@@ -311,7 +311,7 @@ Function.prototype.extendsFrom = function (cls) {
 
         for (var j = 0, item = existingItem[modifier][j]; item; item = existingItem[modifier][++j]) {
             var pname = item.__name;
-            parent += '"' + pname + "\":" + item[pname].strip(';') +",";
+            parent += '"' + pname + "\":" + (item[pname]||"foo").strip(';') +",";
         }
     }
 

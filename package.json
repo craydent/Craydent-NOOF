@@ -1,6 +1,6 @@
 {
   "name": "noof",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Craydent Node Object Oriented Framework",
   "main": "craydent-noof",
   "scripts": {
