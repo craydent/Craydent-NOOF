@@ -1,8 +1,8 @@
 {
   "name": "noof",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Craydent Node Object Oriented Framework",
-  "main": "noof",
+  "main": "craydent-noof",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
