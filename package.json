@@ -4,7 +4,7 @@
   "description": "Craydent Node Object Oriented Framework",
   "main": "craydent-noof",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jasmine-node test/unit_test-spec.js --color --autotest --watch craydent-noof.js"
   },
   "repository": {
     "type": "git",
@@ -19,5 +19,8 @@
   "homepage": "https://bitbucket.org/craydent/craydent-noof#readme",
   "dependencies": {
     "craydent": "^0.5.0"
+  },
+  "devDependencies": {
+    "jasmine-node": "^1.14.5"
   }
 }
