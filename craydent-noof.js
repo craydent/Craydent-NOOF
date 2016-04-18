@@ -100,7 +100,6 @@ function __strongerType(cls, options) {
                 part.__args = [];
 
 
-
                 if (!value && parts[3]) {
                     afunc = $c.strip(parts[3],';');
                     var fargs = $c.getParameters(afunc);
@@ -114,22 +113,24 @@ function __strongerType(cls, options) {
                         value = $c.tryEval(afunc.replace(/function\s+\(.*?\)\s*?\{/,"function ("+parameters.join(',')+"){" + extra));
                     }
                 } else {
+                    if (mparts[2]) {
+                        var args = mparts[2].split(',');
 
-                    var args = (mparts[2] || "").split(',');
-
-                    for (var j = 0, jlen = args.length; j < jlen; j++) {
-                        var arg = __processParameter(args[j]);
-                        //var arg = {name: args[j], type: "any"};
-                        //var aparts = args[j].split('.');
-                        //if (aparts.length > 2) {
-                        //    throw "malformatted argument: " + args[j];
-                        //} else if (aparts.length == 2) {
-                        //    arg.name = aparts[0];
-                        //    arg.type = aparts[1];
-                        //}
-                        part.__args.push(arg);
+                        for (var j = 0, jlen = args.length; j < jlen; j++) {
+                            var arg = __processParameter(args[j]);
+                            //var arg = {name: args[j], type: "any"};
+                            //var aparts = args[j].split('.');
+                            //if (aparts.length > 2) {
+                            //    throw "malformatted argument: " + args[j];
+                            //} else if (aparts.length == 2) {
+                            //    arg.name = aparts[0];
+                            //    arg.type = aparts[1];
+                            //}
+                            part.__args.push(arg);
+                        }
                     }
                 }
+                part.__value = value;
                 a.methods[parts[1].trim()] = a.methods[parts[1].trim()] || [];
                 a.methods[parts[1].trim()].push(part);
             } else {// this is a property
@@ -137,6 +138,7 @@ function __strongerType(cls, options) {
                 part.__name = parg.name;
                 part.__type = parg.type;
                 part.__code = parg.code;
+                part.__value = value;
                 a.properties[parts[1].trim()] = a.properties[parts[1].trim()] || [];
                 a.properties[parts[1].trim()].push(part);
             }
@@ -201,7 +203,7 @@ function __processBlocks(blocks, a, abstractClass, log) {
                     item.__name = parg.name;
                     item.__type = parg.type;
                     item.__code = parg.code;
-                    item[item.__name] = vars[j][1];
+                    item[item.__name] = item.__value = vars[j][1];
                     a.properties["private"].push(item);
                 }
             } else if (blocks[i].startsWithAny("this.","public.","private.","protected.") && !blocks[i].startsWithAny("this.__define","public.__define","private.__define","protected.__define")) {
@@ -215,7 +217,7 @@ function __processBlocks(blocks, a, abstractClass, log) {
                         var mparts = parts[2].match(/method\.([^\s]*?)\s*(?:\((.*?)\))?\s*$/), afunc;
 
                         part.__name = mparts[1];
-                        part[part.__name] = parts[3];
+                        part[part.__name] = part.__value = parts[3];
                         part.__args = [];
 
                         var index, args = null;
@@ -304,7 +306,7 @@ function __processBlocks(blocks, a, abstractClass, log) {
             for (var i = 0, len = methods.length; i < len; i++){
                 var methodName = methods[i].__name.trim(),
                     method = {__name:methodName};
-                method[methodName] = methods[i][methodName];
+                method[methodName] = method.__value = methods[i][methodName];
                 a.methods[modifier].push(method);
             }
         }
@@ -314,7 +316,7 @@ function __processBlocks(blocks, a, abstractClass, log) {
             for (var i = 0, len = properties.length; i < len; i++){
                 var propertyName = properties[i].__name.trim(),
                     property = {__name:propertyName};
-                property[propertyName] = properties[i][propertyName];
+                property[propertyName] = property.__value = properties[i][propertyName];
                 a.properties[modifier].push(property);
 
                 var value = tryEval(properties[i][propertyName]);
@@ -345,7 +347,7 @@ function __checkDefined (modifiers, spec) {
             continue;
         }
         var filtered = modifiers[modifier].filter(function (item){
-            if (spec.__args) {
+            if (spec.__args && spec.__args.length) {
                 if (item.__args.length != len) { return false; }
                 for (var i = 0; i < len; i++) {
                     if (types[i] != "any" && (types[i] != item.__args[i].type || args[i] != item.__args[i].name)) {
@@ -402,9 +404,10 @@ module.exports.Public = function (cls) {
     for (var i = 0, len = modifiers.length; i < len; i++) {
         var modifier = modifiers[i],
             props = a.properties[modifier],
-            meths = a.methods[modifier];
+            meths = a.methods[modifier],
+            context = modAccessible.indexOf(modifier) == -1 ? "var " : "this.";
         for (var j = 0, jlen = props.length; j < jlen; j++) {
-            body += "this." + props[j].__name + " = " + props[j].__value + props[j].__code;
+            body += context + props[j].__name + " = " + props[j].__value + (props[j].__code || "") + ";";
         }
         for (var j = 0, jlen = meths.length; j < jlen; j++) {
             var func = meths[j];
@@ -413,7 +416,7 @@ module.exports.Public = function (cls) {
                 // first time
                 var ofuncname = "_" + fname + j, routeCode = "";
                 var condition = "arguments.length == " + func.__args.length;
-                var funcSyntax = 'this.' + fname + " = function(){";
+                var funcSyntax = context + fname + " = function(){";
                 for (var k = 0, klen = func.__args.length; k < klen; k++) {
                     var arg = func.__args[k];
                     if (arg.type != "any") {
@@ -428,7 +431,7 @@ module.exports.Public = function (cls) {
                 }
                 body += "function " + ofuncname + func.__value.replace('function','');
             } else {
-                body += "this." + meths[j].__name + " = " + meths[j].__value + meths[j].__code;
+                body += context + meths[j].__name + " = " + meths[j].__value + (meths[j].__code || "");
             }
         }
     }
@@ -529,7 +532,7 @@ Function.prototype.extendsFrom = function (cls) {
 
             for (var j = 0, item = missingItem[modifier][j]; item; item = missingItem[modifier][++j]) {
                 var pname = item.__name;
-                additional += prefix + pname + "=" + item[pname]+";";
+                additional += prefix + pname + "=" + $c.parseRaw(item.__value)+";";
             }
 
         }
