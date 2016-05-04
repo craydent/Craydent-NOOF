@@ -110,7 +110,7 @@ function __strongerType(cls, options) {
                         part.__args.push(farg);
                     }
                     if (extra) {
-                        value = $c.tryEval(afunc.replace(/function\s+\(.*?\)\s*?\{/,"function ("+parameters.join(',')+"){" + extra));
+                        value = $c.tryEval(afunc.replace(/function\s*(\*?)\s*\(.*?\)\s*?\{/,"function$1 ("+parameters.join(',')+"){" + extra));
                     }
                 } else {
                     if (mparts[2]) {
@@ -239,7 +239,7 @@ function __processBlocks(blocks, a, abstractClass, log) {
                             part.__args.push(farg);
                         }
                         if (extra) {
-                            var regex = /function\s*\(.*?\)\s*?\{/, replacer = "function ("+parameters.join(',')+"){";
+                            var regex = /function\s*(\*?)\s*\(.*?\)\s*?\{/, replacer = "function$1 ("+parameters.join(',')+"){";
                             value = $c.tryEval(afunc.replace(regex,replacer + extra));
                             parts[3] = parts[3].replace(regex,replacer)
                         }
@@ -587,7 +587,7 @@ Function.prototype.implementsInterface =  function (cls) {
                 throw "Interface " + iname + " " + "must implement " + methodName + "("+$c.strip(sig,',')+")";
             }
             var value = eval("("+method[0][methodName].slice(0,-1)+")");
-            if (!value || !value.isFunction()) {
+            if (!value || (!$c.isFunction(value) && !$c.isGenerator(value))) {
                 throw "Interface " + iname + " property " + methodName + " must be a function";
             }
         }
