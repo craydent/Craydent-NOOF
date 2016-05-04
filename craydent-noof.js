@@ -4,7 +4,7 @@
  *  create final property and methods to prevent override
  *  create abstract property and methods to ensure implementation
  */
-require('craydent');
+require('craydent/noConflict');
 
 $g.GarbageCollector = [];
 var modifiers = ['private','protected','public','this'];
@@ -21,7 +21,7 @@ function __getClassProperties (cls) {
         if (prop.indexOf("this_____") == 0) {
             prop = prop.replace('this','public');
         }
-        if (!tryEval("typeof " + prop)) {
+        if (!$c.tryEval("typeof " + prop)) {
             return undefined;
         }
         return prop;
@@ -71,7 +71,7 @@ function __processParameter (parameter) {
 
 }
 function __strongerType(cls, options) {
-    if (!cls || !cls.isFunction()) {
+    if (!cls || !$c.isFunction(cls)) {
         throw options.missing;
     }
 
@@ -186,7 +186,7 @@ function __processClass(cls) {
             fullLines.push(line+";");
         }
     }
-    return fullLines.condense();
+    return $c.condense(fullLines);
 }
 function __processBlocks(blocks, a, abstractClass, log) {
     if (!abstractClass) {
@@ -206,7 +206,7 @@ function __processBlocks(blocks, a, abstractClass, log) {
                     item[item.__name] = item.__value = vars[j][1];
                     a.properties["private"].push(item);
                 }
-            } else if (blocks[i].startsWithAny("this.","public.","private.","protected.") && !blocks[i].startsWithAny("this.__define","public.__define","private.__define","protected.__define")) {
+            } else if ($c.startsWithAny(blocks[i],"this.","public.","private.","protected.") && !$c.startsWithAny(blocks[i],"this.__define","public.__define","private.__define","protected.__define")) {
                 var parts = blocks[i].match(/^(this|private|protected|public)\.([\s\S]*?)(?:=\s*?([\s\S]*;)|;)/);
                 if (parts && parts.length == 4) { // is some kind of class property [0]=>block [1] => access modifier [2] => property [3] => value
                     var part = {}, value;
@@ -268,7 +268,7 @@ function __processBlocks(blocks, a, abstractClass, log) {
                         part.__name = parg.name;
                         part.__type = parg.type;
                         part.__code = parg.code;
-                        if (value && value.isFunction()) {
+                        if (value && $c.isFunction(value)) {
                             part.__args = [];
                             var index = -1;
                             if ((index = methods.indexOf(part.__name)) == -1) {
@@ -319,8 +319,8 @@ function __processBlocks(blocks, a, abstractClass, log) {
                 property[propertyName] = property.__value = properties[i][propertyName];
                 a.properties[modifier].push(property);
 
-                var value = tryEval(properties[i][propertyName]);
-                if (value && value.isFunction()) {
+                var value = $c.tryEval(properties[i][propertyName]);
+                if (value && $c.isFunction(value)) {
                     a.methods[modifier].push(property);
                 }
             }
@@ -363,7 +363,7 @@ function __checkDefined (modifiers, spec) {
             return spec.__name == item.__name;
             //return item.__name == tName ;
         });
-        if(!filtered.isEmpty()) {
+        if(!$c.isEmpty(filtered)) {
             return filtered;
         }
     }
@@ -437,7 +437,7 @@ module.exports.Public = function (cls) {
     }
 
     $g[name] = eval("(function "+name+"("+__getFuncArgs(cls).join(',')+"){var self=this;"+body+
-        "self.destruct = self.destruct && self.destruct.isFunction() ? self.destruct : function(){};self.construct && self.construct.isFunction() && self.construct.apply(self,arguments);$g.GarbageCollector.push(this);return this;})");
+        "self.destruct = self.destruct && $c.isFunction(self.destruct) ? self.destruct : function(){};self.construct && $c.isFunction(self.construct) && self.construct.apply(self,arguments);$g.GarbageCollector.push(this);return this;})");
     $g[name].methods = a.methods;
     $g[name].properties = a.properties;
     return $g[name];
@@ -537,17 +537,17 @@ Function.prototype.extendsFrom = function (cls) {
 
         }
     }
-    parent = parent.strip(',') + "};";
+    parent = $c.strip(parent,',') + "};";
     var init_code = "var self=this;" +
-        "self.destruct && self.destruct.isFunction() ? self.destruct : function(){};" +
-        "self.construct && self.construct.isFunction() && self.construct.apply(self,arguments);" +
+        "self.destruct && $c.isFunction(self.destruct) ? self.destruct : function(){};" +
+        "self.construct && $c.isFunction(self.construct) && self.construct.apply(self,arguments);" +
         "$g.GarbageCollector.push(this);return this;";
-    $g[name] = eval("(function "+name+"("+__getFuncArgs(this).join(',')+"){"
+    $g[name] = eval($c.replace_all("(function "+name+"("+__getFuncArgs(this).join(',')+"){"
         +additional
         +parent
         +blocks.join('')
-        +(blocks.contains("$g.GarbageCollector.push(this);") ? "" : init_code)
-        +"})".replace_all(';;',';'));
+        +($c.contains(blocks, "$g.GarbageCollector.push(this);") ? "" : init_code)
+        +"})",';;',';'));
     for (var i = 0, prop = "methods"; i < 2; prop = "properties", i++) {
         for (var modifier in missingItems[prop]) {
             a[prop][modifier] = (a[prop][modifier] || []).concat(missingItems[prop][modifier] || []);
