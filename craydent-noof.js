@@ -1,7 +1,15 @@
+/*/---------------------------------------------------------/*/
+/*/ Craydent LLC craydent-noof-v0.1.6                       /*/
+/*/ Copyright 2011 (http://craydent.com/about)              /*/
+/*/ Dual licensed under the MIT or GPL Version 2 licenses.  /*/
+/*/ (http://craydent.com/license)                           /*/
+/*/---------------------------------------------------------/*/
+/*/---------------------------------------------------------/*/
 /*
  * To Do:
  *  make private variables and methods only availabe to the declaring class
  *  create final property and methods to prevent override
+ *  create static methods
  *  create abstract property and methods to ensure implementation
  */
 require('craydent/noConflict');
@@ -52,7 +60,9 @@ function __processParameter (parameter) {
     var strongvar = parameter;
     var fargparts = parameter.split('.');
     if (fargparts.length > 2) {
-        throw "malformatted argument: " + parameter;
+        var err = "malformatted argument: " + parameter;
+        console.error(err);
+        throw err;
     } else if (fargparts.length == 2) {
         pclass = fargparts[0];
         parameter = fargparts[1];
@@ -72,6 +82,7 @@ function __processParameter (parameter) {
 }
 function __strongerType(cls, options) {
     if (!cls || !$c.isFunction(cls)) {
+        console.error(options.missing);
         throw options.missing;
     }
 
@@ -143,11 +154,12 @@ function __strongerType(cls, options) {
                 a.properties[parts[1].trim()].push(part);
             }
         } else {
-            throw "There can not be code block in abtract classes and interfaces";
+            var err = "There can not be code block in abtract classes and interfaces";
+            console.error(err);
+            throw err;
         }
     }
-
-    return $g[name] = a;
+    return __addprotos(module.exports.context[name] = a);
 }
 function __processClass(cls) {
     var clsStr = __removeComments(cls);
@@ -178,7 +190,9 @@ function __processClass(cls) {
                 rparenCount = line.replace(/[^)]/g, "").length;
             }
             if (lbraceCount != rbraceCount ||  lparenCount != rparenCount) {
-                throw "syntax problem " + clsName;
+                var err = "syntax problem " + clsName;
+                console.error(err);
+                throw err;
             }
             if (!line) {
                 continue;
@@ -193,9 +207,27 @@ function __processBlocks(blocks, a, abstractClass, log) {
         var methods = [];
         for (var i = 0, len = blocks.length; i < len; i++) {
             if (blocks[i].startsWith("var ")) {//private var(s)
-                var vars = blocks[i].replace("var ",'').slice(0,-1).split(',').map(function(str){
-                    return str.split('=').map(function(val){return val.trim();});
-                });// vars=[[var, value]]
+
+                var block = blocks[i].replace("var ",'').slice(0,-1);
+                var vars = [];
+                var parts = block.split(',');
+                var blk = "";
+                for (var j = 0, jlen = parts.length; j < jlen; j++) {
+                    blk += parts[j];
+                    var good = false;
+                    try {
+                        eval('var ' + blk);
+                        good = true;
+                    } catch(e){
+                        good = e.toString().indexOf('SyntaxError') == -1;
+                    }
+                    if (good) {
+                        var vparts = blk.split('=');
+                        var val = vparts.splice(1).join('=').trim();
+                        vars.push([vparts[0].trim(),val]);
+                        blk = "";
+                    }
+                }
                 for (var j = 0, jlen = vars.length; j < jlen; j++) {
                     var item = {};
                     var parg = __processParameter(vars[j][0]);
@@ -255,9 +287,11 @@ function __processBlocks(blocks, a, abstractClass, log) {
                                     var mindex = $c.indexOfAlt(a.methods[modifier],part.__name,function(item){return item.__name;});
                                     if (mindex == -1) { continue; }
                                     if ($c.equals(a.methods[modifier][mindex].__args, part.__args)) {
-                                        throw 'Duplicate Error: ' + part.__name + ' has been already declared with the same signature.';
+                                        var err = 'Duplicate Error: ' + part.__name + ' has been already declared with the same signature.';
+                                        console.error(err);
+                                        throw err;
                                     }
-                                    a.methods[modifier][index].__overloaded = part.__overloaded = true;
+                                    a.methods[modifier][mindex].__overloaded = part.__overloaded = true;
                                 } while ((index = methods.indexOf(part.__name, index + 1)) != -1);
                             }
                         }
@@ -279,7 +313,9 @@ function __processBlocks(blocks, a, abstractClass, log) {
                                     do {
                                         if ($c.isEqual(a.methods[modifier][index].__args, part.__args)
                                             && ($c.contains(modAccessible,modifier) && $c.contains(modAccessible,parts[1]) || $c.contains(modInAccessible,modifier) && $c.contains(modInAccessible,parts[1]))) {
-                                            throw 'Duplicate Error: ' + part.__name + ' has been already declared with the same signature.';
+                                            var err = 'Duplicate Error: ' + part.__name + ' has been already declared with the same signature.';
+                                            console.error(err);
+                                            throw err;
                                         }
                                         a.methods[modifier][index].__overloaded = part.__overloaded = true;
                                     } while ((index = methods.indexOf(part.__name, index + 1)) != -1);
@@ -348,11 +384,11 @@ function __checkDefined (modifiers, spec) {
         }
         var filtered = modifiers[modifier].filter(function (item){
             if (spec.__args && spec.__args.length) {
-                if (item.__args.length != len) { return false; }
+                if (item.__args.length != len || item.__name != spec.__name) { return false; }
                 for (var i = 0; i < len; i++) {
-                    if (types[i] != "any" && (types[i] != item.__args[i].type || args[i] != item.__args[i].name)) {
+                    if ((types[i] != "any" && types[i] != 'Object') && (types[i] != item.__args[i].type || args[i] != item.__args[i].name)) {
                         return false;
-                    } else if (types[i] == "any" && args[i] != item.__args[i].name) {
+                    } else if ((types[i] != "any" && types[i] != 'Object') && args[i] != item.__args[i].name) {
                         return false;
                     }
                 }
@@ -369,87 +405,22 @@ function __checkDefined (modifiers, spec) {
     }
     return false;
 }
-module.exports.Abstract = function (acls) {
-    return __strongerType(acls, {
-        missing : "Abstract: missing required Class parameter",
-        instantiation : "Abstract Class can not be instantiated",
-        type : 1
-    });
-};
-module.exports.Interface = function (icls) {
-    return __strongerType(icls, {
-        missing : "Interface: missing required Class parameter",
-        instantiation : "Interfaces can not be instantiated",
-        type : 0
-    });
-};
-module.exports.Namespace = function (name,cls){
-    if (name.indexOf('.') == -1) {
-        !$g[name] && ($g[name] = "");
-        $g[name] += cls.toString();
-    } else {
-        var np = name.split('.')[0];
-        !$g[name] && ($g[name] = "");
-        $g[name] += cls.toString();
-        $g.setProperty(name+"."+cls.name,cls);
-    }
-};
-module.exports.Public = function (cls) {
-    var blocks = __processClass(cls),
-        name = cls.name,
-        a = {methods:{public:[],protected:[],private:[],"this":[]},properties:{public:[],protected:[],private:[],"this":[]}},
-        properties = "", methods = "", body = "";
-    __processBlocks(blocks, a);
+function __addprotos (f) {
+    f.extendsFrom = extendsFrom;
+    f.implementsInterface = implementsInterface;
+    return f;
+}
 
-    for (var i = 0, len = modifiers.length; i < len; i++) {
-        var modifier = modifiers[i],
-            props = a.properties[modifier],
-            meths = a.methods[modifier],
-            context = modAccessible.indexOf(modifier) == -1 ? "var " : "this.";
-        for (var j = 0, jlen = props.length; j < jlen; j++) {
-            body += context + props[j].__name + " = " + props[j].__value + (props[j].__code || "") + ";";
-        }
-        for (var j = 0, jlen = meths.length; j < jlen; j++) {
-            var func = meths[j];
-            if (func.__overloaded) {
-                var fname = func.__name;
-                // first time
-                var ofuncname = "_" + fname + j, routeCode = "";
-                var condition = "arguments.length == " + func.__args.length;
-                var funcSyntax = context + fname + " = function(){";
-                for (var k = 0, klen = func.__args.length; k < klen; k++) {
-                    var arg = func.__args[k];
-                    if (arg.type != "any") {
-                        condition += " && ($c.isNull(arguments[" + k + "]) || arguments[" + k + "].constructor == " + arg.type + ")";
-                    }
-                }
-                routeCode += "if(" + condition + ") { return " + ofuncname + ".apply(this,arguments); }";
-                if (body.indexOf(funcSyntax) == -1) {
-                    body += funcSyntax + routeCode + "};";
-                }  else {
-                    body = body.replace(funcSyntax, funcSyntax + routeCode);
-                }
-                body += "function " + ofuncname + func.__value.replace('function','');
-            } else {
-                body += context + meths[j].__name + " = " + meths[j].__value + (meths[j].__code || "");
-            }
-        }
-    }
-
-    $g[name] = eval("(function "+name+"("+__getFuncArgs(cls).join(',')+"){var self=this;"+body+
-        "self.destruct = self.destruct && $c.isFunction(self.destruct) ? self.destruct : function(){};self.construct && $c.isFunction(self.construct) && self.construct.apply(self,arguments);$g.GarbageCollector.push(this);return this;})");
-    $g[name].methods = a.methods;
-    $g[name].properties = a.properties;
-    return $g[name];
-};
-module.exports.Use = eval;
-
-Function.prototype.extendsFrom = function (cls) {
+var extendsFrom = function (cls) {
     if (cls.___type === 0) {
-        throw "Class is not extendible";
+        var err = "Class is not extendible";
+        console.error(err);
+        throw err;
     }
     if (cls.___type !== 1 && this.__type === 1) { // when trying to extend an abstract class with a normal class
-        throw "Abstract classes cannot extend a non-abstract class";
+        var err = "Abstract classes cannot extend a non-abstract class";
+        console.error(err);
+        throw err;
     }
     var clsToExtend,
         isAbstract = cls.___type === 1;
@@ -499,7 +470,7 @@ Function.prototype.extendsFrom = function (cls) {
     }
 
     if (isAbstract) {
-        return this;
+        return __addprotos(this);
     }
 
     var existingItem = existingItems["methods"],
@@ -542,7 +513,7 @@ Function.prototype.extendsFrom = function (cls) {
         "self.destruct && $c.isFunction(self.destruct) ? self.destruct : function(){};" +
         "self.construct && $c.isFunction(self.construct) && self.construct.apply(self,arguments);" +
         "$g.GarbageCollector.push(this);return this;";
-    $g[name] = eval($c.replace_all("(function "+name+"("+__getFuncArgs(this).join(',')+"){"
+    module.exports.context[name] = eval($c.replace_all("(function "+name+"("+__getFuncArgs(this).join(',')+"){"
         +additional
         +parent
         +blocks.join('')
@@ -553,14 +524,16 @@ Function.prototype.extendsFrom = function (cls) {
             a[prop][modifier] = (a[prop][modifier] || []).concat(missingItems[prop][modifier] || []);
         }
     }
-    $g[name].methods = a.methods;
-    $g[name].properties = a.properties;
+    module.exports.context[name].methods = a.methods;
+    module.exports.context[name].properties = a.properties;
 
-    return $g[name]
+    return __addprotos(module.exports.context[name]);
 };
-Function.prototype.implementsInterface =  function (cls) {
+var implementsInterface = function (cls) {
     if (cls.___type !== 0) {
-        throw "Class is not an Interface";
+        var err = "Class is not an Interface";
+        console.error(err);
+        throw err;
     }
     var blocks = __processClass(this),
         name = this.name,
@@ -576,19 +549,21 @@ Function.prototype.implementsInterface =  function (cls) {
         for (var i = 0, len = methods.length; i < len; i++) {
             var methodName = methods[i].__name,
                 method = __checkDefined(a.methods, methods[i]);
-//            method = a.methods.filter(function(item){return item.__name == methodName;});
-//            if (method.isEmpty()) {
             if (!method) {
                 var sig = "";
                 for (var j = 0, jlen = methods[i].__args.length; j < jlen; j++) {
                     var arg = methods[i].__args[j]
                     sig += arg.type + "." +arg.name + ",";
                 }
-                throw "Interface " + iname + " " + "must implement " + methodName + "("+$c.strip(sig,',')+")";
+                var err = "Interface " + iname + " " + "must implement " + methodName + "("+$c.strip(sig,',')+")";
+                console.error(err);
+                throw err;
             }
             var value = eval("("+method[0][methodName].slice(0,-1)+")");
             if (!value || (!$c.isFunction(value) && !$c.isGenerator(value))) {
-                throw "Interface " + iname + " property " + methodName + " must be a function";
+                var err = "Interface " + iname + " property " + methodName + " must be a function";
+                console.error(err);
+                throw err;
             }
         }
     }
@@ -598,18 +573,99 @@ Function.prototype.implementsInterface =  function (cls) {
             var propertyName = properties[i].__name;
 //            if (a.properties.filter(function(item){return item.__name == propertyName;}).isEmpty()) {
             if (!__checkDefined(a.properties, properties[i])) {
-                throw propertyName + " must be defined";
+                var err = propertyName + " must be defined";
+                console.error(err);
+                throw err;
             }
         }
     }
     // if it gets to here the class passes the contract
 
     if (isAbstract) {
-        return this;
+        return __addprotos(this);
     }
 
-    return $g[name] = eval("(function "+name+"("+__getFuncArgs(this).join(',')+"){"+blocks.join('')+"}"+")");
+    return __addprotos(module.exports.context[name] = eval("(function "+name+"("+__getFuncArgs(this).join(',')+"){"+blocks.join('')+"}"+")"));
 };
+module.exports.Abstract = function (acls) {
+    return __strongerType(acls, {
+        missing : "Abstract: missing required Class parameter",
+        instantiation : "Abstract Class can not be instantiated",
+        type : 1
+    });
+};
+module.exports.Interface = function (icls) {
+    return __strongerType(icls, {
+        missing : "Interface: missing required Class parameter",
+        instantiation : "Interfaces can not be instantiated",
+        type : 0
+    });
+};
+module.exports.Namespace = function (name,cls){
+    if (name.indexOf('.') == -1) {
+        !module.exports.context[name] && (module.exports.context[name] = "");
+        module.exports.context[name] += cls.toString();
+    } else {
+        var np = name.split('.')[0];
+        !module.exports.context[name] && (module.exports.context[name] = "");
+        module.exports.context[name] += cls.toString();
+        module.exports.context.setProperty(name+"."+cls.name,cls);
+    }
+};
+module.exports.Public = function (cls) {
+    var blocks = __processClass(cls),
+        name = cls.name,
+        a = {methods:{public:[],protected:[],private:[],"this":[]},properties:{public:[],protected:[],private:[],"this":[]}},
+        properties = "", methods = "", body = "";
+    __processBlocks(blocks, a);
+
+    for (var i = 0, len = modifiers.length; i < len; i++) {
+        var modifier = modifiers[i],
+            props = a.properties[modifier],
+            meths = a.methods[modifier],
+            context = modAccessible.indexOf(modifier) == -1 ? "var " : "this.";
+        for (var j = 0, jlen = props.length; j < jlen; j++) {
+            body += context + props[j].__name + " = " + props[j].__value + (props[j].__code || "") + ";";
+        }
+        for (var j = 0, jlen = meths.length; j < jlen; j++) {
+            var func = meths[j];
+            if (func.__overloaded) {
+                var fname = func.__name;
+                // first time
+                var ofuncname = "_" + fname + j, routeCode = "";
+                var condition = "arguments.length == " + func.__args.length;
+                var funcSyntax = context + fname + " = function(){";
+                for (var k = 0, klen = func.__args.length; k < klen; k++) {
+                    var arg = func.__args[k];
+                    if (arg.type != "any") {
+                        condition += " && ($c.isNull(arguments[" + k + "]) || arguments[" + k + "].constructor == " + arg.type + ")";
+                    }
+                }
+                routeCode += "if(" + condition + ") { return " + ofuncname + ".apply(this,arguments); }";
+                if (body.indexOf(funcSyntax) == -1) {
+                    body += funcSyntax + routeCode + "};";
+                }  else {
+                    body = body.replace(funcSyntax, funcSyntax + routeCode);
+                }
+                body += "function " + ofuncname + func.__value.replace('function','');
+            } else {
+                body += context + meths[j].__name + " = " + meths[j].__value + (meths[j].__code || "");
+            }
+        }
+    }
+
+    module.exports.context[name] = eval("(function "+name+"("+__getFuncArgs(cls).join(',')+"){var self=this;"+body+
+        "self.destruct = self.destruct && $c.isFunction(self.destruct) ? self.destruct : function(){};self.construct && $c.isFunction(self.construct) && self.construct.apply(self,arguments);$g.GarbageCollector.push(this);return this;})");
+    module.exports.context[name].methods = a.methods;
+    module.exports.context[name].properties = a.properties;
+    return __addprotos(module.exports.context[name]);
+};
+module.exports.Use = eval;
+module.exports.extendsFrom = extendsFrom;
+module.exports.implementsInterface = implementsInterface;
+module.exports.proto = ['extendsFrom','implementsInterface'];
+module.exports.context = module.exports;
+
 
 function getDocumentation (cls, html) {
     var str = "", nl = "\n", tb="    ";
