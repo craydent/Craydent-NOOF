@@ -10,9 +10,11 @@
  *  make private variables and methods only availabe to the declaring class
  *  create final property and methods to prevent override
  *  create static methods
+ *  create aliasing for methods and vars
  *  create abstract property and methods to ensure implementation
  */
-require('craydent/noConflict');
+var $c = require('craydent/noConflict');
+$g = global;
 
 $g.GarbageCollector = [];
 var modifiers = ['private','protected','public','this'];
@@ -261,7 +263,7 @@ function __processBlocks(blocks, a, abstractClass, log) {
                         }
 
 
-                        afunc = $c.strip(parts[3],';');
+                        afunc = $c.strip(parts[3] || (parts[3] = "function(){};"),';');
                         var fargs = args || $c.getParameters(afunc);
                         var extra = "",parameters = [];
                         for (var k = 0, klen = fargs.length; k < klen; k++) {
