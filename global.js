@@ -15,3 +15,4 @@ for (var prop in noof) {
 	global[prop] = noof[prop];
 }
 noof.context = global;
+module.exports = noof;

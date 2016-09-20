@@ -1,7 +1,7 @@
 require('./Base.js');
-Namespace("Datu", Public(function Users (params) {}).extendsFrom(Items));
+Namespace("Cray", Public(function Users (params) {}).extendsFrom(Items));
 
-Namespace("Datu", Public(function User (params) {
+Namespace("Cray", Public(function User (params) {
 	var dt = $c.now() , dob = new Date(params && params.date_of_birth || '');
 	public.type = "User";
 	public.first_name = "";
