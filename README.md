@@ -34,19 +34,19 @@ protected.String.str = "";
 public.variable = "";
 public.String.str = "";
 
-private.method.foo = function () {};
+private.method.foo = function () { /* your code goes here */ };
 
-protected.method.foo = function () {};
+protected.method.foo = function () { /* your code goes here */ };
 
-public.method.foo = function () {};
+public.method.foo = function () { /* your code goes here */ };
 ```
 ### Overloading methods
 ```js
-public.method.foo(Number.a) = function(a){};
-public.method.foo(String.a, Number.b) = function(a, b){};
-public.method.foo(Object.a, String.b, Boolean.c) = function (a, b, c) {};
-public.method.foo(Number.a, Array.d, Date.c) = function(a, d, c){};
-public.method.foo(String.a, String.b, String.c, String.d) = function(a, b, c, d){};
+public.method.foo(Number.a) = function(a) { /* your code goes here */ };
+public.method.foo(String.a, Number.b) = function(a, b) { /* your code goes here */ };
+public.method.foo(Object.a, String.b, Boolean.c) = function (a, b, c) { /* your code goes here */ };
+public.method.foo(Number.a, Array.d, Date.c) = function(a, d, c) { /* your code goes here */ };
+public.method.foo(String.a, String.b, String.c, String.d) = function(a, b, c, d) { /* your code goes here */ };
 ```
 
 ### Defining Namespaces
@@ -56,8 +56,8 @@ Namespace("NOOF",
         public.type = "User";
         public.first_name = "";
         public.last_name = "";
-        public.method.foo(Number.a) = function(a){};
-        public.method.foo(String.a, Number.b) = function(a, b){};
+        public.method.foo(Number.a) = function(a) { /* your code goes here */ };
+        public.method.foo(String.a, Number.b) = function(a, b) { /* your code goes here */ };
     })
 )
 ```
@@ -68,9 +68,9 @@ Interface(function IClass () {
 	public.String.name;
 	public.method.foo(String.a);
 	public.method.foo(Number.a);
-	public.method.foo(a,b);
-	public.method.foo(a,b,c);
-	public.method.foo(a,d,c);
+	public.method.foo(a, b);
+	public.method.foo(a, b, c);
+	public.method.foo(a, d, c);
 	public.method.bar;
 })
 ```
@@ -82,8 +82,8 @@ Abstract(function Base() {
 	public.Date.now = null;
 	protected.Array.vals = [];
 
-	public.method.foo(String.a) = function(){};
-	public.method.foobar = function* (){};
+	public.method.foo(String.a) = function(a) { /* your code goes here */ };
+	public.method.foobar = function* () { /* your code goes here */ };
 });
 ```
 
@@ -93,8 +93,8 @@ Public(function User (params) {
     public.type = "User";
     public.first_name = "";
     public.last_name = "";
-    public.method.foo(Number.a) = function(a){};
-    public.method.foo(String.a, Number.b) = function(a, b){};
+    public.method.foo(Number.a) = function(a) { /* your code goes here */ };
+    public.method.foo(String.a, Number.b) = function(a, b) { /* your code goes here */ };
 })
 ```
 
@@ -102,14 +102,14 @@ Public(function User (params) {
 ```js
 Public(function NewClass () {
 	public.String.name = "";
-	public.method.foo(String.a) = function(a){};
-	public.method.foo(Number.a) = function(a){};
-	public.method.foo(String.a, Number.b) = function(a, b){};
-	public.method.foo(Object.a, String.b, Boolean.c) = function (a, b, c) {};
-	public.method.foo(Number.a,Array.d,Date.c) = function(a, d, c){};
-	public.method.foo(String.a,String.b,String.c,String.d) = function(){};
+	public.method.foo(String.a) = function(a) { /* your code goes here */ };
+	public.method.foo(Number.a) = function(a) { /* your code goes here */ };
+	public.method.foo(String.a, Number.b) = function(a, b) { /* your code goes here */ };
+	public.method.foo(Object.a, String.b, Boolean.c) = function (a, b, c) { /* your code goes here */ };
+	public.method.foo(Number.a, Array.d, Date.c) = function(a, d, c) { /* your code goes here */ };
+	public.method.foo(String.a, String.b, String.c, String.d) = function(a, b, c, d) { /* your code goes here */ };
 
-	public.method.bar = function*(a,b){};
+	public.method.bar = function*(a,b) { /* your code goes here */ };
     	
 }).implementsInterface(IClass);
 ```
@@ -118,13 +118,13 @@ Public(function NewClass () {
 ```js
 Public(function NewClass () {
 	public.String.name = "Clark";
-	public.method.foo(Number.a) = function(){};
-	public.method.foo(String.a,Number.b) = function(){};
-	public.method.foo(Object.a, String.b, Boolean.c) = function () {};
-	public.method.foo(Number.a,Array.d,Date.c) = function(){};
-	public.method.foo(String.a,String.b,String.c,String.d) = function(){};
+	public.method.foo(Number.a) = function(a) { /* your code goes here */ };
+	public.method.foo(String.a, Number.b) = function(a, b) { /* your code goes here */ };
+	public.method.foo(Object.a, String.b, Boolean.c) = function (a, b, c) { /* your code goes here */ };
+	public.method.foo(Number.a, Array.d, Date.c) = function (a, d, c) { /* your code goes here */ };
+	public.method.foo(String.a, String.b, String.c, String.d) = function (a, b, c, d) { /* your code goes here */ };
 
-	public.method.bar = function*(a,b){}
+	public.method.bar = function*(a, b) { /* your code goes here */ }
 }).extendsFrom(Base);
 ```
 
@@ -132,13 +132,13 @@ Public(function NewClass () {
 ```js
 Public(function NewClass () {
 	public.String.name = "Clark";
-	public.method.foo(Number.a) = function(){};
-	public.method.foo(String.a,Number.b) = function(){};
-	public.method.foo(Object.a, String.b, Boolean.c) = function () {};
-	public.method.foo(Number.a,Array.d,Date.c) = function(){};
-	public.method.foo(String.a,String.b,String.c,String.d) = function(){};
+	public.method.foo(Number.a) = function (a) { /* your code goes here */ };
+	public.method.foo(String.a, Number.b) = function (a, b) { /* your code goes here */ };
+	public.method.foo(Object.a, String.b, Boolean.c) = function (a, b, c) { /* your code goes here */ };
+	public.method.foo(Number.a, Array.d, Date.c) = function (a, d, c) { /* your code goes here */ };
+	public.method.foo(String.a, String.b, String.c, String.d) = function (a, b, c, d) { /* your code goes here */ };
 
-	public.method.bar = function*(a,b){}
+	public.method.bar = function*(a, b) { /* your code goes here */ }
 }).extendsFrom(Base).implementsInterface(IClass);
 ```
 
