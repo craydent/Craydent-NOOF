@@ -1,5 +1,5 @@
 /*/---------------------------------------------------------/*/
-/*/ Craydent LLC craydent-noof-v0.1.6                       /*/
+/*/ Craydent LLC craydent-noof-v0.2.2                       /*/
 /*/ Copyright 2011 (http://craydent.com/about)              /*/
 /*/ Dual licensed under the MIT or GPL Version 2 licenses.  /*/
 /*/ (http://craydent.com/license)                           /*/
@@ -66,8 +66,8 @@ function __processParameter (parameter) {
         console.error(err);
         throw err;
     } else if (fargparts.length == 2) {
-        pclass = fargparts[0];
-        parameter = fargparts[1];
+        pclass = (fargparts[0] || "").trim();
+        parameter = (fargparts[1] || "").trim();
     }
     if (pval) {
         extra += "this." + parameter + " = " + "this." + parameter + " || " + pval;
@@ -75,9 +75,9 @@ function __processParameter (parameter) {
     if (pclass && pclass != "any") {
         var typeError = "'Invalid Type: " + parameter + " must be type "+pclass+"'";
         extra += "if (!$c.isNull(this." + parameter + ") && " + "this." + parameter + ".constructor != " + pclass + ") { throw new Error("+typeError+");}";
-        extra += "var ___"+parameter+" = this."+parameter+";"
-        extra += "this.__defineSetter__('"+parameter+"', function(val){ if (!$c.isNull(val) && val.constructor != " + pclass + ") { throw new Error('Invalid Type: " + parameter + " must be type "+pclass+"'); }___"+parameter+" = val; });"
-        extra += "this.__defineGetter__('"+parameter+"', function(){ return ___"+parameter+"; });"
+        extra += "var ___"+parameter+" = this."+parameter+";";
+        extra += "this.__defineSetter__('"+parameter+"', function(val){ if (!$c.isNull(val) && val.constructor != " + pclass + ") { throw new Error('Invalid Type: " + parameter + " must be type "+pclass+"'); }___"+parameter+" = val; });";
+        extra += "this.__defineGetter__('"+parameter+"', function(){ return ___"+parameter+"; });";
     }
     return {name:parameter,type:pclass,code:extra};
 
@@ -102,7 +102,7 @@ function __strongerType(cls, options) {
             parts[2] = parts[2].trim();
             part[parts[2]] = parts[3];
             value = $c.tryEval($c.strip(parts[3] || "",';'));
-
+            var mod = parts[1].trim();
             if (parts[2].startsWith('method.')) {// this is a methodvar name = parts[2].replace('method.','');
                 var mparts = parts[2].match(/method\.([^\s]*?)\s*(?:\((.*?)\))?$/), afunc;
                 var pname = mparts[1];
@@ -131,32 +131,38 @@ function __strongerType(cls, options) {
 
                         for (var j = 0, jlen = args.length; j < jlen; j++) {
                             var arg = __processParameter(args[j]);
-                            //var arg = {name: args[j], type: "any"};
-                            //var aparts = args[j].split('.');
-                            //if (aparts.length > 2) {
-                            //    throw "malformatted argument: " + args[j];
-                            //} else if (aparts.length == 2) {
-                            //    arg.name = aparts[0];
-                            //    arg.type = aparts[1];
-                            //}
+
                             part.__args.push(arg);
                         }
                     }
                 }
                 part.__value = value;
-                a.methods[parts[1].trim()] = a.methods[parts[1].trim()] || [];
-                a.methods[parts[1].trim()].push(part);
+                a.methods[mod] = a.methods[mod] || [];
+                var overloads = $c.where(a.methods[mod],{__name:part.__name}), o = 0, overload;
+                while (overload = overloads[o++]) {
+                    if (overload.__args.length != part.__args.length) { continue; }
+                    var different = false;
+                    for (var ai = 0, ailen = overload.__args.length; ai < ailen; ai++) {
+                        if (overload.__args[ai].type != part.__args[ai].type) { different = true; break; }
+                    }
+                    if (!different) {
+                        var err = 'Duplicate Error: ' + a.name + "." + part.__name + ' has been already declared with the same signature.';
+                        console.error(err);
+                        throw err;
+                    }
+                }
+                a.methods[mod].push(part);
             } else {// this is a property
                 var parg = __processParameter(parts[2].trim());
                 part.__name = parg.name;
                 part.__type = parg.type;
                 part.__code = parg.code;
                 part.__value = value;
-                a.properties[parts[1].trim()] = a.properties[parts[1].trim()] || [];
-                a.properties[parts[1].trim()].push(part);
+                a.properties[mod] = a.properties[mod] || [];
+                a.properties[mod].push(part);
             }
         } else {
-            var err = "There can not be code block in abtract classes and interfaces";
+            var err = "There can not be code block in abstract classes and interfaces";
             console.error(err);
             throw err;
         }
@@ -371,7 +377,7 @@ function __getFuncArgs (func) {
 }
 function __checkDefined (modifiers, spec) {
     //var tName = spec.__name;
-    var args = [],types = [];
+    var args = [],types = [], any = {any:1,Object:1};
     if (spec.__args) {
         for (var i = 0, len = spec.__args.length; i < len; i++) {
             args.push(spec.__args[i].name);
@@ -388,9 +394,9 @@ function __checkDefined (modifiers, spec) {
             if (spec.__args && spec.__args.length) {
                 if (item.__args.length != len || item.__name != spec.__name) { return false; }
                 for (var i = 0; i < len; i++) {
-                    if ((types[i] != "any" && types[i] != 'Object') && (types[i] != item.__args[i].type || args[i] != item.__args[i].name)) {
+                    if (!(types[i] in any) && (types[i] != item.__args[i].type/* || args[i] != item.__args[i].name*/)) {
                         return false;
-                    } else if ((types[i] != "any" && types[i] != 'Object') && args[i] != item.__args[i].name) {
+                    } else if (!(types[i] in any) && args[i] != item.__args[i].name) {
                         return false;
                     }
                 }
@@ -421,6 +427,11 @@ var extendsFrom = function (cls) {
     }
     if (cls.___type !== 1 && this.__type === 1) { // when trying to extend an abstract class with a normal class
         var err = "Abstract classes cannot extend a non-abstract class";
+        console.error(err);
+        throw err;
+    }
+    if (!this.name) {
+        var err = "Extended Class can not be anonymous.";
         console.error(err);
         throw err;
     }
@@ -537,6 +548,11 @@ var implementsInterface = function (cls) {
         console.error(err);
         throw err;
     }
+    if (!cls.name || !this.name) {
+        var err = "Interface can not be anonymous.";
+        console.error(err);
+        throw err;
+    }
     var blocks = __processClass(this),
         name = this.name,
         isAbstract = this.___type === 1,
@@ -544,7 +560,7 @@ var implementsInterface = function (cls) {
     this.methods || __processBlocks(blocks, a, isAbstract && this,true); // this alters blocks and a
     var iMethods = cls.methods,
         iProperties = cls.properties,
-        iname = cls.name;
+        iname = cls.name, errs = [];
 
     for (var modifier in iMethods) {
         var methods = iMethods[modifier];
@@ -557,15 +573,19 @@ var implementsInterface = function (cls) {
                     var arg = methods[i].__args[j]
                     sig += arg.type + "." +arg.name + ",";
                 }
-                var err = "Interface " + iname + " " + "must implement " + methodName + "("+$c.strip(sig,',')+")";
+                var err = this.name + " implements interface " + iname + " which must implement " + methodName + "("+$c.strip(sig,',')+")";
                 console.error(err);
-                throw err;
+                errs.push(err);
+                continue;
+                //throw err;
             }
             var value = eval("("+method[0][methodName].slice(0,-1)+")");
             if (!value || (!$c.isFunction(value) && !$c.isGenerator(value))) {
-                var err = "Interface " + iname + " property " + methodName + " must be a function";
+                var err = this.name + " implements interface " + iname + " and the property " + methodName + " must be a function";
                 console.error(err);
-                throw err;
+                errs.push(err);
+                continue;
+                //throw err;
             }
         }
     }
@@ -577,9 +597,13 @@ var implementsInterface = function (cls) {
             if (!__checkDefined(a.properties, properties[i])) {
                 var err = propertyName + " must be defined";
                 console.error(err);
-                throw err;
+                errs.push(err);
+                //throw err;
             }
         }
+    }
+    if (errs.length) {
+        throw errs;
     }
     // if it gets to here the class passes the contract
 
@@ -590,6 +614,11 @@ var implementsInterface = function (cls) {
     return __addprotos(module.exports.context[name] = eval("(function "+name+"("+__getFuncArgs(this).join(',')+"){"+blocks.join('')+"}"+")"));
 };
 module.exports.Abstract = function (acls) {
+    if (!acls.name) {
+        var err = "Abstract Class can not be anonymous.";
+        console.error(err);
+        throw err;
+    }
     return __strongerType(acls, {
         missing : "Abstract: missing required Class parameter",
         instantiation : "Abstract Class can not be instantiated",
@@ -597,6 +626,11 @@ module.exports.Abstract = function (acls) {
     });
 };
 module.exports.Interface = function (icls) {
+    if (!icls.name) {
+        var err = "Interface can not be anonymous.";
+        console.error(err);
+        throw err;
+    }
     return __strongerType(icls, {
         missing : "Interface: missing required Class parameter",
         instantiation : "Interfaces can not be instantiated",
@@ -604,17 +638,43 @@ module.exports.Interface = function (icls) {
     });
 };
 module.exports.Namespace = function (name,cls){
-    if (name.indexOf('.') == -1) {
-        !module.exports.context[name] && (module.exports.context[name] = "");
-        module.exports.context[name] += cls.toString();
-    } else {
-        var np = name.split('.')[0];
-        !module.exports.context[name] && (module.exports.context[name] = "");
-        module.exports.context[name] += cls.toString();
-        module.exports.context.setProperty(name+"."+cls.name,cls);
+    if (!cls.name) {
+        var err = "Namespace Class can not be anonymous.";
+        console.error(err);
+        throw err;
     }
+    //if (name.indexOf('.') == -1) {
+    //    !module.exports.context[name] && (module.exports.context[name] = "");
+    //    module.exports.context[name] += cls.toString();
+    //} else {
+    //    !module.exports.context[name] && (module.exports.context[name] = "");
+    //    module.exports.context[name] += cls.toString();
+    //    module.exports.context.setProperty(name+"."+cls.name,cls);
+    //}
+    var current = module.exports.context, path = "__namespaces." + name,
+        np = $c.getProperty(current, path);
+
+
+    //module.exports.context.setProperty("__namespaces." + name + "." + cls.name, cls);
+    if (!np) {
+        $c.setProperty(current, path, {});
+        np = $c.getProperty(current, path);
+    }
+    if (!cls.methods || !cls.properties) {
+        module.exports.context = np;
+        module.exports.Public(cls);
+    } else {
+        current.__namespaces[name][cls.name] = cls;
+    }
+    module.exports.context = current;
+
 };
 module.exports.Public = function (cls) {
+    if (!cls.name) {
+        var err = "Public Class can not be anonymous.";
+        console.error(err);
+        throw err;
+    }
     var blocks = __processClass(cls),
         name = cls.name,
         a = {methods:{public:[],protected:[],private:[],"this":[]},properties:{public:[],protected:[],private:[],"this":[]}},
@@ -662,7 +722,22 @@ module.exports.Public = function (cls) {
     module.exports.context[name].properties = a.properties;
     return __addprotos(module.exports.context[name]);
 };
-module.exports.Use = eval;
+module.exports.Use = function (np, raw){
+    var rtn = $c.getProperty(module.exports.context,"__namespaces." + np);
+    if ($c.isFunction(rtn) && rtn.methods && rtn.properties) {
+        return raw ? rtn.toString() : rtn;
+    }
+    if (!raw) {
+        return rtn;
+    }
+    raw = "";
+    for (var prop in rtn) {
+        if (!rtn.hasOwnProperty(prop)) { continue; }
+        raw += rtn[prop].toString();
+    }
+    return raw;
+
+};
 module.exports.extendsFrom = extendsFrom;
 module.exports.implementsInterface = implementsInterface;
 module.exports.proto = ['extendsFrom','implementsInterface'];
