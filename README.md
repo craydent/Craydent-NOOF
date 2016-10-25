@@ -209,6 +209,7 @@ $ npm i --save noof
 
  * [GitHub](https://github.com/craydent/Craydent-NOOF)
  * [BitBucket](https://bitbucket.org/craydent/craydent-noof)
+ * [GitLab](https://bitbucket.org/craydent/craydent-noof)
 
 The Craydent NOOF is released under the [Dual licensed under the MIT or GPL Version 2 licenses](http://craydent.com/license).<br>
 

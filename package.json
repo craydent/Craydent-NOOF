@@ -4,11 +4,12 @@
   "description": "Craydent Node Object Oriented Framework",
   "main": "craydent-noof",
   "scripts": {
-    "test": "jasmine-node test/unit_test-spec.js --color --autotest --watch craydent-noof.js"
+    "test": "jasmine-node test/unit_test-spec.js --color --autotest --watch craydent-noof.js",
+    "publish": "git push public;"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://cinada@bitbucket.org/craydent/craydent-noof.git"
+    "url": "git+https://cinada@bitbucket.org/craydent/noof.git"
   },
   "keywords": [
     "craydent",
@@ -16,7 +17,7 @@
   ],
   "author": "Clark Inada",
   "license": "MIT",
-  "homepage": "https://bitbucket.org/craydent/craydent-noof#readme",
+  "homepage": "https://bitbucket.org/craydent/noof#readme",
   "dependencies": {
     "craydent": "^0.6.17"
   },
