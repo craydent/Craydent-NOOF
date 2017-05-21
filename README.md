@@ -1,6 +1,6 @@
 <img src="http://craydent.com/JsonObjectEditor/img/svgs/craydent-logo.svg" width=75 height=75/>
 
-# Craydent NOOF 0.2.2
+# Craydent NOOF 0.2.3
 **by Clark Inada**
 
 NOOF (Node Object Oriented Framework) module is a framework to enable object oriented practices to JavaScript.  With this module, you are able define:
@@ -44,11 +44,17 @@ protected.String.str = "";
 public.variable = "";
 public.String.str = "";
 
+
 private.method.foo = function () { /* your code goes here */ };
-
 protected.method.foo = function () { /* your code goes here */ };
-
 public.method.foo = function () { /* your code goes here */ };
+
+// Specify a return type.
+// Return types are checked at runtime and will throw errors when specified type is not returned
+private.method.Boolean.isTrue = function () { /* your code goes here */ };
+protected.method.Boolean.isTrue = function () { /* your code goes here */ };
+public.method.Boolean.isTrue = function () { /* your code goes here */ };
+
 ```
 ### Overloading methods
 ```js

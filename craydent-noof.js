@@ -1,5 +1,5 @@
 /*/---------------------------------------------------------/*/
-/*/ Craydent LLC craydent-noof-v0.2.2                       /*/
+/*/ Craydent LLC craydent-noof-v0.2.3                       /*/
 /*/ Copyright 2011 (http://craydent.com/about)              /*/
 /*/ Dual licensed under the MIT or GPL Version 2 licenses.  /*/
 /*/ (http://craydent.com/license)                           /*/
@@ -20,6 +20,52 @@ $g.GarbageCollector = [];
 var modifiers = ['private','protected','public','this'];
 var modAccessible = ['public','this'];
 var modInAccessible = ['private','protected'];
+var defaultCode = "self.destruct = self.destruct && $c.isFunction(self.destruct) ? self.destruct : function(){};" +
+    "self.construct && $c.isFunction(self.construct) && self.construct.apply(self,arguments);" +
+    "$g.GarbageCollector.push(this);return this;";
+function __addprotos (f) {
+    f.extendsFrom = extendsFrom;
+    f.implementsInterface = implementsInterface;
+    return f;
+}
+function __checkDefined (modifiers, spec) {
+    //var tName = spec.__name;
+    var args = [],types = [], any = {any:1,Object:1};
+    if (spec.__args) {
+        for (var i = 0, len = spec.__args.length; i < len; i++) {
+            args.push(spec.__args[i].name);
+            types.push(spec.__args[i].type);
+        }
+    }
+    var len = args.length;
+
+    for (var modifier in modifiers) {
+        if (!modifiers.hasOwnProperty(modifier)){
+            continue;
+        }
+        var filtered = modifiers[modifier].filter(function (item){
+            if (spec.__args && spec.__args.length) {
+                if (item.__args.length != len || item.__name != spec.__name) { return false; }
+                for (var i = 0; i < len; i++) {
+                    if (!(types[i] in any) && (types[i] != item.__args[i].type/* || args[i] != item.__args[i].name*/)) {
+                        return false;
+                    } else if (!(types[i] in any) && args[i] != item.__args[i].name) {
+                        return false;
+                    }
+                }
+                return true;
+                //return $c.equals($c.getParameters(item[item.__name]), args);
+                //return $c.equals(item.__args, spec.__args);
+            }
+            return spec.__name == item.__name;
+            //return item.__name == tName ;
+        });
+        if(!$c.isEmpty(filtered)) {
+            return filtered;
+        }
+    }
+    return false;
+}
 function __getClassProperties (cls) {
     return (__removeComments(cls).match(RegExp('(this|private|protected|public)\.(.|\n|\r\n)*?;','g'))||[]).map(function (p) {
         var prop = p.replace(/\./g, '_____').replace(';',''),
@@ -37,6 +83,9 @@ function __getClassProperties (cls) {
         return prop;
     });
 }
+function __getFuncArgs (func) {
+    return func.toString().trim().replace(/\s*/gi, '').replace(/.*?\((.*?)\).*/, '$1').split(',');
+}
 function __getUnformattedPropertyName(prop, details) {
     var arr = prop.split('_____');
     details = details || {};
@@ -48,167 +97,6 @@ function __getUnformattedPropertyName(prop, details) {
     }
 
     return arr.splice(1,arr.length).join('_____');
-}
-function __removeComments(cls){
-    return cls.toString().replace(/\/\/[\s\S]*?\n/g,'').replace(/\/\*[\s\S]*?\*\//g,'');
-}
-function __processParameter (parameter) {
-    var pval,pclass = "any",extra = "";
-    if ($c.contains(parameter,'=')) {
-        var varval = parameter.split('=');
-        parameter = varval[0];
-        pval = varval[1];
-    }
-    var strongvar = parameter;
-    var fargparts = parameter.split('.');
-    if (fargparts.length > 2) {
-        var err = "malformatted argument: " + parameter;
-        console.error(err);
-        throw err;
-    } else if (fargparts.length == 2) {
-        pclass = (fargparts[0] || "").trim();
-        parameter = (fargparts[1] || "").trim();
-    }
-    if (pval) {
-        extra += "this." + parameter + " = " + "this." + parameter + " || " + pval;
-    }
-    if (pclass && pclass != "any") {
-        var typeError = "'Invalid Type: " + parameter + " must be type "+pclass+"'";
-        extra += "if (!$c.isNull(this." + parameter + ") && " + "this." + parameter + ".constructor != " + pclass + ") { throw new Error("+typeError+");}";
-        extra += "var ___"+parameter+" = this."+parameter+";";
-        extra += "this.__defineSetter__('"+parameter+"', function(val){ if (!$c.isNull(val) && val.constructor != " + pclass + ") { throw new Error('Invalid Type: " + parameter + " must be type "+pclass+"'); }___"+parameter+" = val; });";
-        extra += "this.__defineGetter__('"+parameter+"', function(){ return ___"+parameter+"; });";
-    }
-    return {name:parameter,type:pclass,code:extra};
-
-}
-function __strongerType(cls, options) {
-    if (!cls || !$c.isFunction(cls)) {
-        console.error(options.missing);
-        throw options.missing;
-    }
-
-    var blocks = __processClass(cls),
-        name = cls.name,
-        a = eval("(function "+name+" () {throw \""+options.instantiation+"\";})");
-    a.___type = options.type;
-    a.methods = {public:[],protected:[],private:[],"this":[]};
-    a.properties = {public:[],protected:[],private:[],"this":[]};
-
-    for (var i = 0, len = blocks.length; i < len; i++) {
-        var parts = blocks[i].match(/^(this|private|protected|public)\.([\s\S]*?)(?:=\s*?([\s\S]*;)|;)/);
-        if (parts && parts.length == 4) { // is some kind of class property [0]=>block [1] => access modifier [2] => property [3] => value
-            var part = {}, value;
-            parts[2] = parts[2].trim();
-            part[parts[2]] = parts[3];
-            value = $c.tryEval($c.strip(parts[3] || "",';'));
-            var mod = parts[1].trim();
-            if (parts[2].startsWith('method.')) {// this is a methodvar name = parts[2].replace('method.','');
-                var mparts = parts[2].match(/method\.([^\s]*?)\s*(?:\((.*?)\))?$/), afunc;
-                var pname = mparts[1];
-
-                delete part[parts[2]];
-                part[pname] = parts[3];
-                part.__name = pname;
-                part.__args = [];
-
-
-                if (!value && parts[3]) {
-                    afunc = $c.strip(parts[3],';');
-                    var fargs = $c.getParameters(afunc);
-                    var extra = "",parameters = [];
-                    for (var k = 0, klen = fargs; k < klen; k++) {
-                        var farg = __processParameter(fargs[k]);
-                        extra += farg.code;
-                        part.__args.push(farg);
-                    }
-                    if (extra) {
-                        value = $c.tryEval(afunc.replace(/function\s*(\*?)\s*\(.*?\)\s*?\{/,"function$1 ("+parameters.join(',')+"){" + extra));
-                    }
-                } else {
-                    if (mparts[2]) {
-                        var args = mparts[2].split(',');
-
-                        for (var j = 0, jlen = args.length; j < jlen; j++) {
-                            var arg = __processParameter(args[j]);
-
-                            part.__args.push(arg);
-                        }
-                    }
-                }
-                part.__value = value;
-                a.methods[mod] = a.methods[mod] || [];
-                var overloads = $c.where(a.methods[mod],{__name:part.__name}), o = 0, overload;
-                while (overload = overloads[o++]) {
-                    if (overload.__args.length != part.__args.length) { continue; }
-                    var different = false;
-                    for (var ai = 0, ailen = overload.__args.length; ai < ailen; ai++) {
-                        if (overload.__args[ai].type != part.__args[ai].type) { different = true; break; }
-                    }
-                    if (!different) {
-                        var err = 'Duplicate Error: ' + a.name + "." + part.__name + ' has been already declared with the same signature.';
-                        console.error(err);
-                        throw err;
-                    }
-                }
-                a.methods[mod].push(part);
-            } else {// this is a property
-                var parg = __processParameter(parts[2].trim());
-                part.__name = parg.name;
-                part.__type = parg.type;
-                part.__code = parg.code;
-                part.__value = value;
-                a.properties[mod] = a.properties[mod] || [];
-                a.properties[mod].push(part);
-            }
-        } else {
-            var err = "There can not be code block in abstract classes and interfaces";
-            console.error(err);
-            throw err;
-        }
-    }
-    return __addprotos(module.exports.context[name] = a);
-}
-function __processClass(cls) {
-    var clsStr = __removeComments(cls);
-    var clsName = cls.name;
-    var regexp = new RegExp('\\s*?function\\s*?'+clsName+'\\s*?\\([\\s\\S]*?\\)[\\s\\S]*?\\{');
-    var lastIndex = clsStr.lastIndexOf('}');
-    if (clsStr[lastIndex-1] == ';') {
-        lastIndex--;
-    }
-    var lines = clsStr.substring(0,lastIndex).replace(regexp, '').split(';').map(function(item){return item.trim();});
-    var fullLines = [];
-    for (var i = 0, len = lines.length, line = lines[i]; i < len; line = lines[++i]) {
-        var lbraceCount = line.replace(/[^{]/g, "").length,
-            rbraceCount = line.replace(/[^}]/g, "").length,
-            lparenCount = line.replace(/[^(]/g, "").length,
-            rparenCount = line.replace(/[^)]/g, "").length;
-        if (lbraceCount == rbraceCount && lparenCount == rparenCount) {
-            if (!line) {
-                continue;
-            }
-            fullLines.push(line+";");
-        } else {
-            while ((lbraceCount != rbraceCount || lparenCount != rparenCount) && i < len) {
-                line += ";"+lines[++i];
-                lbraceCount = line.replace(/[^{]/g, "").length;
-                rbraceCount = line.replace(/[^}]/g, "").length;
-                lparenCount = line.replace(/[^(]/g, "").length;
-                rparenCount = line.replace(/[^)]/g, "").length;
-            }
-            if (lbraceCount != rbraceCount ||  lparenCount != rparenCount) {
-                var err = "syntax problem " + clsName;
-                console.error(err);
-                throw err;
-            }
-            if (!line) {
-                continue;
-            }
-            fullLines.push(line+";");
-        }
-    }
-    return $c.condense(fullLines);
 }
 function __processBlocks(blocks, a, abstractClass, log) {
     if (!abstractClass) {
@@ -256,7 +144,14 @@ function __processBlocks(blocks, a, abstractClass, log) {
                     if (parts[2].startsWith('method.') /*|| (value && value.isFunction())*/) {// this is a methodvar name = parts[2].replace('method.','');
                         var mparts = parts[2].match(/method\.([^\s]*?)\s*(?:\((.*?)\))?\s*$/), afunc;
 
-                        part.__name = mparts[1];
+                        var type_and_name = [];
+                        mparts[1] && (type_and_name = mparts[1].split('.'));
+
+                        var method_has_type_defined = type_and_name.length != 1;
+
+                        delete part[parts[2]];
+                        part.__name = !method_has_type_defined ? type_and_name[0] : type_and_name[1];
+                        part.__return_type = method_has_type_defined ? type_and_name[0] : "any";
                         part[part.__name] = part.__value = parts[3];
                         part.__args = [];
 
@@ -337,7 +232,7 @@ function __processBlocks(blocks, a, abstractClass, log) {
 
                     part[part.__name] = part.__value = parts[3];
                     blocks[i] = (parts[1] == "private" || parts[1] == "protected"?"var ":"this.") +
-                        part.__name + (parts[3] ? "=" + parts[3] : "")+";";
+                        part.__name + (parts[3] ? " =" + parts[3] : "")+";";
                 }
             }
         }
@@ -372,51 +267,209 @@ function __processBlocks(blocks, a, abstractClass, log) {
 
     }
 }
-function __getFuncArgs (func) {
-    return func.toString().trim().replace(/\s*/gi, '').replace(/.*?\((.*?)\).*/, '$1').split(',');
-}
-function __checkDefined (modifiers, spec) {
-    //var tName = spec.__name;
-    var args = [],types = [], any = {any:1,Object:1};
-    if (spec.__args) {
-        for (var i = 0, len = spec.__args.length; i < len; i++) {
-            args.push(spec.__args[i].name);
-            types.push(spec.__args[i].type);
+function __processClass(cls) {
+    var clsStr = __removeComments(cls);
+    var clsName = cls.name;
+    var regexp = new RegExp('\\s*?function\\s*?'+clsName+'\\s*?\\([\\s\\S]*?\\)[\\s\\S]*?\\{');
+    var lastIndex = clsStr.lastIndexOf('}');
+    if (clsStr[lastIndex-1] == ';') {
+        lastIndex--;
+    }
+    var lines = clsStr.substring(0,lastIndex).replace(regexp, '').split(';').map(function(item){return item.trim();});
+    var fullLines = [];
+    for (var i = 0, len = lines.length, line = lines[i]; i < len; line = lines[++i]) {
+        var lbraceCount = line.replace(/[^{]/g, "").length,
+            rbraceCount = line.replace(/[^}]/g, "").length,
+            lparenCount = line.replace(/[^(]/g, "").length,
+            rparenCount = line.replace(/[^)]/g, "").length;
+        if (lbraceCount == rbraceCount && lparenCount == rparenCount) {
+            if (!line) {
+                continue;
+            }
+            fullLines.push(line+";");
+        } else {
+            while ((lbraceCount != rbraceCount || lparenCount != rparenCount) && i < len) {
+                line += ";"+lines[++i];
+                lbraceCount = line.replace(/[^{]/g, "").length;
+                rbraceCount = line.replace(/[^}]/g, "").length;
+                lparenCount = line.replace(/[^(]/g, "").length;
+                rparenCount = line.replace(/[^)]/g, "").length;
+            }
+            if (lbraceCount != rbraceCount ||  lparenCount != rparenCount) {
+                var err = "syntax problem " + clsName;
+                console.error(err);
+                throw err;
+            }
+            if (!line) {
+                continue;
+            }
+            fullLines.push(line+";");
         }
     }
-    var len = args.length;
+    return $c.condense(fullLines);
+}
+function __processParameter (parameter) {
+    var pval,pclass = "any",extra = "";
+    if ($c.contains(parameter,'=')) {
+        var varval = parameter.split('=');
+        parameter = varval[0];
+        pval = varval[1];
+    }
+    var strongvar = parameter;
+    var fargparts = parameter.split('.');
+    if (fargparts.length > 2) {
+        var err = "malformatted argument: " + parameter;
+        console.error(err);
+        throw err;
+    } else if (fargparts.length == 2) {
+        pclass = (fargparts[0] || "").trim();
+        parameter = (fargparts[1] || "").trim();
+    }
+    if (pval) {
+        extra += "this." + parameter + " = " + "this." + parameter + " || " + pval;
+    }
+    if (pclass && pclass != "any") {
+        var typeError = "'Invalid Type: " + parameter + " must be type "+pclass+"'";
+        extra += "if (!$c.isNull(this." + parameter + ") && " + "this." + parameter + ".constructor != " + pclass + ") { throw new Error("+typeError+");}";
+        extra += "var ___"+parameter+" = this."+parameter+";";
+        extra += "this.__defineSetter__('"+parameter+"', function(val){ if (!$c.isNull(val) && val.constructor != " + pclass + ") { throw new Error('Invalid Type: " + parameter + " must be type "+pclass+"'); }___"+parameter+" = val; });";
+        extra += "this.__defineGetter__('"+parameter+"', function(){ return ___"+parameter+"; });";
+    }
+    return {name:parameter,type:pclass,code:extra};
 
-    for (var modifier in modifiers) {
-        if (!modifiers.hasOwnProperty(modifier)){
-            continue;
+}
+function __removeComments(cls){
+    return cls.toString().replace(/\/\/[\s\S]*?\n/g,'').replace(/\/\*[\s\S]*?\*\//g,'');
+}
+function __render_methods(context, func, body) {
+    var fname = func.__name;
+    var rtype = func.__return_type;
+    var fvalue = func.__value.toString();
+    var type_check_code = rtype == "any" ? " return rtn;" : "if ($c.isNull(rtn) || \"" + rtype + "\" != $c.getName(rtn.constructor)) { " +
+        "   throw 'Returned value for " + fname + " was not of type " + rtype + "';" +
+        "} return rtn;";
+    //if the function is overloaded
+    if (func.__overloaded) {
+        // first time
+        var ofuncname = "_" + fname + $c.suid(5), routeCode = "";
+        var condition = "arguments.length == " + func.__args.length;
+        var funcSyntax = context + fname + " = function(){";
+        for (var i = 0, len = func.__args.length; i < len; i++) {
+            var arg = func.__args[i];
+            if (arg.type != "any") {
+                condition += " && ($c.isNull(arguments[" + i + "]) || arguments[" + i + "].constructor == " + arg.type + ")";
+            }
         }
-        var filtered = modifiers[modifier].filter(function (item){
-            if (spec.__args && spec.__args.length) {
-                if (item.__args.length != len || item.__name != spec.__name) { return false; }
-                for (var i = 0; i < len; i++) {
-                    if (!(types[i] in any) && (types[i] != item.__args[i].type/* || args[i] != item.__args[i].name*/)) {
-                        return false;
-                    } else if (!(types[i] in any) && args[i] != item.__args[i].name) {
-                        return false;
+        routeCode += "if(" + condition + ") { var rtn = " + ofuncname + ".apply(this,arguments); " + type_check_code + " }";
+        if (body.indexOf(funcSyntax) == -1) {
+            body = funcSyntax + routeCode + "};" + body;
+        }  else {
+            body = body.replace(funcSyntax, funcSyntax + routeCode);
+        }
+        body = "function " + ofuncname + fvalue.replace('function','') + body;
+    } else {
+        if (rtype != "any") {
+            fvalue = "function(){ " +
+                "var rtn = (" + $c.strip(fvalue,';') + ").apply(this, arguments); " +
+                type_check_code +
+                "};";
+        }
+        body = context + fname + " = " + fvalue + (func.__code || "") + ';' + body;
+    }
+    return body;
+}
+function __strongerType(cls, options) {
+    if (!cls || !$c.isFunction(cls)) {
+        console.error(options.missing);
+        throw options.missing;
+    }
+
+    var blocks = __processClass(cls),
+        name = cls.name,
+        a = eval("(function "+name+" () {throw \""+options.instantiation+"\";})");
+    a.___type = options.type;
+    a.methods = {public:[],protected:[],private:[],"this":[]};
+    a.properties = {public:[],protected:[],private:[],"this":[]};
+
+    for (var i = 0, len = blocks.length; i < len; i++) {
+        var parts = blocks[i].match(/^(this|private|protected|public)\.([\s\S]*?)(?:=\s*?([\s\S]*;)|;)/);
+        if (parts && parts.length == 4) { // is some kind of class property [0]=>block [1] => access modifier [2] => property [3] => value
+            var part = {}, value;
+            parts[2] = parts[2].trim();
+            part[parts[2]] = parts[3];
+            value = $c.tryEval($c.strip(parts[3] || "",';'));
+            var mod = parts[1].trim();
+            if (parts[2].startsWith('method.')) {// this is a methodvar name = parts[2].replace('method.','');
+                var mparts = parts[2].match(/method\.([^\s]*?)\s*(?:\((.*?)\))?$/), afunc;
+                var type_and_name = [];
+                mparts[1] && (type_and_name = mparts[1].split('.'));
+
+                var method_has_type_defined = type_and_name.length != 1;
+                var pname = !method_has_type_defined ? type_and_name[0] : type_and_name[1];
+
+                delete part[parts[2]];
+                part.__return_type = method_has_type_defined ? type_and_name[0] : "any";
+                part[pname] = parts[3];
+                part.__name = pname;
+                part.__args = [];
+
+
+                if (!value && parts[3]) {
+                    afunc = $c.strip(parts[3],';');
+                    var fargs = $c.getParameters(afunc);
+                    var extra = "",parameters = [];
+                    for (var k = 0, klen = fargs; k < klen; k++) {
+                        var farg = __processParameter(fargs[k]);
+                        extra += farg.code;
+                        part.__args.push(farg);
+                    }
+                    if (extra) {
+                        value = $c.tryEval(afunc.replace(/function\s*(\*?)\s*\(.*?\)\s*?\{/,"function$1 ("+parameters.join(',')+"){" + extra));
+                    }
+                } else {
+                    if (mparts[2]) {
+                        var args = mparts[2].split(',');
+
+                        for (var j = 0, jlen = args.length; j < jlen; j++) {
+                            var arg = __processParameter(args[j]);
+
+                            part.__args.push(arg);
+                        }
                     }
                 }
-                return true;
-                //return $c.equals($c.getParameters(item[item.__name]), args);
-                //return $c.equals(item.__args, spec.__args);
+                part.__value = value;
+                a.methods[mod] = a.methods[mod] || [];
+                var overloads = $c.where(a.methods[mod],{__name:part.__name}), o = 0, overload;
+                while (overload = overloads[o++]) {
+                    if (overload.__args.length != part.__args.length) { continue; }
+                    var different = false;
+                    for (var ai = 0, ailen = overload.__args.length; ai < ailen; ai++) {
+                        if (overload.__args[ai].type != part.__args[ai].type) { different = true; break; }
+                    }
+                    if (!different) {
+                        var err = 'Duplicate Error: ' + a.name + "." + part.__name + ' has been already declared with the same signature.';
+                        console.error(err);
+                        throw err;
+                    }
+                    overload.__overloaded = part.__overloaded = true;
+                }
+                a.methods[mod].push(part);
+            } else {// this is a property
+                var parg = __processParameter(parts[2].trim());
+                part.__name = parg.name;
+                part.__type = parg.type;
+                part.__code = parg.code;
+                part.__value = value;
+                a.properties[mod] = a.properties[mod] || [];
+                a.properties[mod].push(part);
             }
-            return spec.__name == item.__name;
-            //return item.__name == tName ;
-        });
-        if(!$c.isEmpty(filtered)) {
-            return filtered;
+        } else {
+            var err = "There can not be code block in abstract classes and interfaces";
+            console.error(err);
+            throw err;
         }
     }
-    return false;
-}
-function __addprotos (f) {
-    f.extendsFrom = extendsFrom;
-    f.implementsInterface = implementsInterface;
-    return f;
+    return __addprotos(module.exports.context[name] = a);
 }
 
 var extendsFrom = function (cls) {
@@ -469,7 +522,7 @@ var extendsFrom = function (cls) {
 
             for (var j = 0, jlen = types.length; j < jlen; j++) {
                 var tName = types[j].__name;
-                if (!__checkDefined(a[type], tName)) {
+                if (!__checkDefined(a[type], types[j])) {
                     if (!isAbstract) {
                         missingItems[type][modifier].push(types[j]);
                     } else if (type == "methods") {
@@ -489,7 +542,7 @@ var extendsFrom = function (cls) {
     var existingItem = existingItems["methods"],
         parent = "var parent = {";
     for (var modifier in existingItem) {
-        if (!existingItem.hasOwnProperty(modifier)) {
+        if (!existingItem.hasOwnProperty(modifier) || !existingItem[modifier].length) {
             continue;
         }
         var prefix = "var ";
@@ -499,11 +552,12 @@ var extendsFrom = function (cls) {
 
         for (var j = 0, item = existingItem[modifier][j]; item; item = existingItem[modifier][++j]) {
             var pname = item.__name;
-            parent += '"' + pname + "\":" + (item[pname]||"foo").strip(';') +",";
+            parent += '"' + pname + "\":" + $c.strip((item[pname]||"foo"), ';') +",";
         }
     }
 
     var additional = "";
+    blocks = blocks.join('');
     for (var i = 0, missingItem = missingItems["methods"]; i < 2; obj = aProperties,missingItem = missingItems["properties"], i++) {
         for (var modifier in missingItem) {
             if (!missingItem.hasOwnProperty(modifier)) {
@@ -515,23 +569,22 @@ var extendsFrom = function (cls) {
             }
 
             for (var j = 0, item = missingItem[modifier][j]; item; item = missingItem[modifier][++j]) {
-                var pname = item.__name;
-                additional += prefix + pname + "=" + $c.parseRaw(item.__value)+";";
+                if (!i) {
+                    blocks = __render_methods(prefix,  item, blocks);
+                } else {
+                    additional += prefix + item.__name + "=" + $c.parseRaw(item.__value) + ";";
+                }
             }
 
         }
     }
     parent = $c.strip(parent,',') + "};";
-    var init_code = "var self=this;" +
-        "self.destruct && $c.isFunction(self.destruct) ? self.destruct : function(){};" +
-        "self.construct && $c.isFunction(self.construct) && self.construct.apply(self,arguments);" +
-        "$g.GarbageCollector.push(this);return this;";
     module.exports.context[name] = eval($c.replace_all("(function "+name+"("+__getFuncArgs(this).join(',')+"){"
-        +additional
-        +parent
-        +blocks.join('')
-        +($c.contains(blocks, "$g.GarbageCollector.push(this);") ? "" : init_code)
-        +"})",';;',';'));
+        + additional
+        + parent
+        + blocks
+        + ($c.contains(blocks, defaultCode) ? "" : "var self=this;" + defaultCode)
+        + "})",';;',';'));
     for (var i = 0, prop = "methods"; i < 2; prop = "properties", i++) {
         for (var modifier in missingItems[prop]) {
             a[prop][modifier] = (a[prop][modifier] || []).concat(missingItems[prop][modifier] || []);
@@ -686,38 +739,18 @@ module.exports.Public = function (cls) {
             props = a.properties[modifier],
             meths = a.methods[modifier],
             context = modAccessible.indexOf(modifier) == -1 ? "var " : "this.";
+        // create properties
         for (var j = 0, jlen = props.length; j < jlen; j++) {
             body += context + props[j].__name + " = " + props[j].__value + (props[j].__code || "") + ";";
         }
         for (var j = 0, jlen = meths.length; j < jlen; j++) {
-            var func = meths[j];
-            if (func.__overloaded) {
-                var fname = func.__name;
-                // first time
-                var ofuncname = "_" + fname + j, routeCode = "";
-                var condition = "arguments.length == " + func.__args.length;
-                var funcSyntax = context + fname + " = function(){";
-                for (var k = 0, klen = func.__args.length; k < klen; k++) {
-                    var arg = func.__args[k];
-                    if (arg.type != "any") {
-                        condition += " && ($c.isNull(arguments[" + k + "]) || arguments[" + k + "].constructor == " + arg.type + ")";
-                    }
-                }
-                routeCode += "if(" + condition + ") { return " + ofuncname + ".apply(this,arguments); }";
-                if (body.indexOf(funcSyntax) == -1) {
-                    body += funcSyntax + routeCode + "};";
-                }  else {
-                    body = body.replace(funcSyntax, funcSyntax + routeCode);
-                }
-                body += "function " + ofuncname + func.__value.replace('function','');
-            } else {
-                body += context + meths[j].__name + " = " + meths[j].__value + (meths[j].__code || "");
-            }
+            body = __render_methods(context,  meths[j], body);
         }
     }
 
-    module.exports.context[name] = eval("(function "+name+"("+__getFuncArgs(cls).join(',')+"){var self=this;"+body+
-        "self.destruct = self.destruct && $c.isFunction(self.destruct) ? self.destruct : function(){};self.construct && $c.isFunction(self.construct) && self.construct.apply(self,arguments);$g.GarbageCollector.push(this);return this;})");
+    module.exports.context[name] = eval("(function "+name+"("+__getFuncArgs(cls).join(',')+"){" +
+        "var self=this;" + body + defaultCode +
+    "})");
     module.exports.context[name].methods = a.methods;
     module.exports.context[name].properties = a.properties;
     return __addprotos(module.exports.context[name]);

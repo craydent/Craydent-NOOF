@@ -14,7 +14,7 @@ Abstract(function Base(){
 		_set_values(params);
 	};
 	/*Overloads*/
-	protected.method._add = function (/*prop, key, value, callback*/) {
+	protected.method.Boolean._add = function (/*prop, key, value, callback*/) {
 		try {
 			var prop = arguments[0],
 				key = arguments[1],
